@@ -43,7 +43,7 @@ def generate(config, out='./my-map.html'):
                             
 
 
-        template = os.path.join(__file__, 'hexmap.template.html')
+        template = os.path.join(os.path.dirname(__file__), 'hexmap.template.html')
 
         with open(template, "r", encoding="utf-8") as template_file:
                 template = template_file.read()  # Reads the entire file
