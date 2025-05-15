@@ -2,6 +2,8 @@ import os, json, io
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
+from pyproj import Transformer
+
 
 # import webbrowser
 
@@ -51,17 +53,42 @@ def generate(config, out='./my-map.html'):
         #         template = template_file.read()  # Reads the entire file
 
         with csv_string(input) as data:
-        
+            
+            
+            if "fields" in config:
+                config['map']['options-json']['fields']=config['fields']
+                
+                
+                if 'crs' in config['fields']:
+                    
+                    df = pd.read_csv(io.StringIO(data))
+            
+                    print(df.iloc[0])
+                   
+                    transformer = Transformer.from_crs(config['fields']['crs'], "EPSG:4326", always_xy=True)
+                    source = config['fields']['source']
+                    df[[source['x'], source['y']]] = df.apply(lambda row: pd.Series(transformer.transform(row[source['x']], row[source['y']])), axis=1)
+                    dest = config['fields']['dest']
+                    df[[dest['x'], dest['y']]] = df.apply(lambda row: pd.Series(transformer.transform(row[dest['x']], row[dest['y']])), axis=1)
+
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+
+                    data = csv_buffer.getvalue()
         # with open(input, "r", encoding="utf-8") as csv_file:
         #     data = csv_file.read()  # Reads the entire file
 
             for key, value in config['map'].items():
+                
                 
                 key=key.replace('-', '_').upper()
                 print(f"{key}:{value}")
                 if key.endswith('_JSON'):
                     key = key.replace('_JSON', '')
                     value=json.dumps(value)
+                
+                
+                    
                     
                 template=template.replace(f"{{{{{key}}}}}", value);
 
@@ -94,6 +121,10 @@ def csv_string(file):
     '''
     Read csv or xlsx, but return csv text
     '''
+    if not os.path.exists(file):
+        file=os.path.realpath(file)
+        raise Exception(f"File Not Found: {file}")
+    
     if file.lower().endswith('.csv'):
         with open(file, "r", encoding="utf-8") as csv_file:
             yield csv_file.read() 

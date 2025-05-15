@@ -282,6 +282,20 @@
                 let destFields = null;
 
                 (() => {
+
+
+                    if(options['fields']){
+                        if(options['fields']['source']){
+                            fields=options['fields']['source']
+                        }
+
+                        if(options['fields']['dest']){
+                            destFields=options['fields']['dest']
+                        }
+
+                        return;
+                    }
+
                     const d = data[0];
                     const keys = Object.keys(d).map((k) => { return k.toLowerCase(); });
                     const k_ = Object.keys(d)
@@ -386,6 +400,7 @@
                 fields.resolution = options['hex-grid-zoom'];
                 fields.color = options["source-color"].hex;
                 fields.index = '_source_hex'
+                fields.height= typeof options['height-scale-source']=='number'?options['height-scale-source']:options['height-scale'];
 
                 // Add the hexagons as a GeoJSON source
                 const hexagons = generateCells(data, fields, grid);
@@ -436,6 +451,7 @@
                     destFields.color = options["dest-color"].hex;
                     destFields.offsets = [hexagons]
                     destFields.index = '_dest_hex'
+                    destFields.height= typeof options['height-scale-dest']=='number'?options['height-scale-dest']:options['height-scale'];
 
                     const destHexagons = generateCells(data, destFields, grid);
 
@@ -631,9 +647,9 @@
                 // Buffer hexagons around the center
                 const hexIndexes = grid.get_radius_indexes(centerH3Index, 0); // 1 ring radius for neighboring hexes
 
-                var height = options['height-scale'];
+                var height = typeof config.height=='number'?config.height:options['height-scale'];
                 if (typeof row.count != 'undefined') {
-                    height = parseInt(row.count) * options['height-scale'];
+                    height = parseInt(row.count) * height
                 }
 
                 hexIndexes.forEach((index) => {
