@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='uitr-map-gen',
-    version='0.1.0',
+    version='0.1.1',
     description='quick hex/grid/square/polygon map generators for interactive histogram maps',
     author='Nick Blackwell',
     author_email='nick.blackwell@ubc.ca',

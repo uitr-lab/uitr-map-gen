@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histogram Map</title>
+    <script src="https://unpkg.com/mapbox-gl@2.14.0/dist/mapbox-gl.js"></script>
+    <script src="https://unpkg.com/h3-js"></script>
+    <script src="https://unpkg.com/deck.gl@8.9.28/dist.min.js"></script>
+    <script src="https://unpkg.com/@deck.gl/mapbox@8.9.28/dist.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.0/mapbox-gl.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        #map~button {
+            position: absolute;
+            bottom: 40px;
+            right: 10px;
+            z-index: 10;
+            background: #ffffff80;
+            border: none;
+            border-radius: 4px;
+            padding: 5px;
+            font-size: 15px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+
+        #overlay-spin {
+            bottom: 40px;
+        }
+
+        #overlay-light-dark {
+            bottom: 80px !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map" class=""></div>
+    <button id="overlay-spin">
+        <i class="fa-solid fa-rotate-right"></i>
+    </button>
+    <button id="overlay-light-dark">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-regular fa-lightbulb"></i>
+        <i class="fa-solid fa-tree"></i>
+    </button>
+
+
+    <script>
+
+        const options = {{OPTIONS}}
+
+        const styles = {
+            'light': 'mapbox://styles/mapbox/light-v10',
+            'dark': 'mapbox://styles/mapbox/dark-v10',
+            'street': 'mapbox://styles/mapbox/streets-v12'
+        }
+
+        mapboxgl.accessToken = '{{ACCESS_TOKEN}}';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: styles[options.style],
+            center: [-119.477829, 49.882114],
+            zoom: 9,
+            pitch: 60,
+            bearing: 0,
+            antialias: true
+        });
+
+        map.on('click', e => {
+            const { lng, lat } = e.lngLat;
+            console.log(`Clicked at longitude: ${lng}, latitude: ${lat}`);
+        });
+
+
+
+        class grid_cells {
+
+            constructor(grid) {
+                this._grid = grid
+                document.title = `Polygon Grid`;
+            }
+
+            get_index(lat, lng) {
+                const point = turf.point([lng, lat]);  // Note: [lng, lat] order
+
+                for (let i = 0; i < this._grid.features.length; i++) {
+                    const feature = this._grid.features[i];
+                    if (turf.booleanPointInPolygon(point, feature)) {
+                        return String(i);  // Index of the feature that contains the point
+                    }
+                }
+
+                return String(Math.floor(Math.random() * this._grid.features.length)); // No match
+            }
+            get_center(index) {
+                // return [y, x]
+                const feature = this._grid.features[parseInt(index)];
+                const coords = turf.centroid(feature).geometry.coordinates;
+                return [coords[1], coords[0]]
+            }
+
+            get_radius_indexes(index, radius) {
+                return [index];
+            }
+
+            get_geometry(index) {
+                const feature = this._grid.features[parseInt(index)];
+                return feature.geometry
+            }
+
+            get_wireframe(){
+                const lineFeatures = [];
+                const polygonFeatures = this._grid.features.filter(
+                    f => f.geometry && (f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon")
+                );
+
+                polygonFeatures.forEach((f, i) => {
+                    try {
+                        const lines = turf.polygonToLine(f);
+                        if (lines.type === "FeatureCollection") {
+                            lineFeatures.push(...lines.features);
+                        } else {
+                            lineFeatures.push(lines); // Single Feature
+                        }
+                    } catch (e) {
+                        console.warn(`Failed at index ${i}:`, e.message);
+                    }
+                });
+
+                const wireframeData = {
+                    type: "FeatureCollection",
+                    features: lineFeatures
+                };
+                return wireframeData;
+            }
+
+        }
+
+
+        class square_cells extends grid_cells{
+
+            constructor(bounds, cellSize) {
+                super()
+                const bbox = bounds; // [minX, minY, maxX, maxY]
+                const options = { units: 'meters' };
+                this._grid = turf.squareGrid(bbox, cellSize, options);
+
+                document.title = `Square Grid: ${cellSize}m`;
+            }
+
+        }
+
+        class h3_cells {
+
+            constructor(resolution) {
+                this._resolution = resolution
+                document.title = `Hex Grid: ${resolution}z`;
+            }
+
+            get_index(lat, lng) {
+                return h3.latLngToCell(lat, lng, this._resolution)
+            }
+            get_center(index) {
+                return h3.cellToLatLng(index)
+            }
+
+            get_radius_indexes(index, radius) {
+                return h3.gridDisk(index, radius)
+            }
+            get_geometry(index) {
+                const geoJsonCoords = h3.cellToBoundary(index).map(([lat, lng]) => [lng, lat]);
+                geoJsonCoords.push(geoJsonCoords[0])
+
+                return {
+                    type: 'Polygon',
+                    coordinates: [geoJsonCoords]
+                }
+            }
+
+        }
+
+
+        let grid = new h3_cells(options['hex-grid-zoom']);
+        
+
+
+        const fog = {
+            light: {
+                range: [0.5, 10],
+                color: 'white',
+                'high-color': '#add8e6',
+                'space-color': '#d8f2ff',
+                'horizon-blend': 0.3
+            },
+            dark: {
+                "range": [-1, 10],
+                "color": 'black',
+                "horizon-blend": 0.3,
+                "high-color": '#000000',
+                "space-color": '#000000',
+                "star-intensity": 0.3
+            }
+
+        }
+
+
+        map.on('load', function () {
+
+            if (fog[options.style]) {
+                map.setFog(fog[options.style]);
+                document.getElementById('map').classList.add(options.style)
+            }
+
+            
+
+            fetchGridFromUrl('grid.csv', (gridData) => {
+
+                grid = new grid_cells(gridData)
+
+
+                if(options["grid-opacity"]>0){
+                    map.addSource('wireframe', {
+                        type: 'geojson',
+                        data: grid.get_wireframe()
+                    });
+                    map.addLayer({
+                        id: 'wireframe-layer',
+                        type: 'line',
+                        source: 'wireframe',
+                        paint: {
+                            'line-color': '#000000',
+                            'line-width': 0.5,
+                            'line-opacity':0.5*options["grid-opacity"]
+                        }
+                    });
+                }
+
+            })
+
+
+            drawLayers('dark');
+
+        });
+
+
+        options["source-color"] = parseHexWithAlpha(options["source-color"], options["arc-opacity"]);
+        options["dest-color"] = parseHexWithAlpha(options["dest-color"], options["arc-opacity"]);
+
+        const drawLayers = () => {
+            fetchCsvFromUrl('data.csv', (results) => {
+
+                const data = results.data.filter((row) => {
+                    return Math.random() <= options['data-sample'];
+                })
+
+
+
+                
+
+
+                let fields = { x: 'lng', y: 'lat' };
+                let destFields = null;
+
+                (() => {
+                    const d = data[0];
+                    const keys = Object.keys(d).map((k) => { return k.toLowerCase(); });
+                    const k_ = Object.keys(d)
+                    if (keys.indexOf('lng') > 0 && keys.indexOf('lat') > 0) {
+                        fields = { x: k_[keys.indexOf('lng')], y: k_[keys.indexOf('lat')] };
+                    }
+
+                    if (keys.indexOf('origin_x') > 0 && keys.indexOf('origin_y') > 0) {
+                        fields = { x: k_[keys.indexOf('origin_x')], y: k_[keys.indexOf('origin_y')] };
+                        if (keys.indexOf('dest_x') > 0 && keys.indexOf('dest_y') > 0) {
+                            destFields = { x: k_[keys.indexOf('dest_x')], y: k_[keys.indexOf('dest_y')] };
+                        }
+                    }
+
+                    if (keys.indexOf('org_lon') > 0 && keys.indexOf('org_lat') > 0) {
+                        fields = { x: k_[keys.indexOf('org_lon')], y: k_[keys.indexOf('org_lat')] };
+                        if (keys.indexOf('des_lon') > 0 && keys.indexOf('des_lat') > 0) {
+                            destFields = { x: k_[keys.indexOf('des_lon')], y: k_[keys.indexOf('des_lat')] };
+                        }
+                    }
+
+
+                })()
+
+                if(options['grid']&&options['grid']=='square'){
+                    grid=new square_cells(simpleBounds(data, fields), options['square-size'])
+
+                    if(options["grid-opacity"]>0){
+                        map.addSource('wireframe', {
+                            type: 'geojson',
+                            data: grid.get_wireframe()
+                        });
+                        map.addLayer({
+                            id: 'wireframe-layer',
+                            type: 'line',
+                            source: 'wireframe',
+                            paint: {
+                                'line-color': '#000000',
+                                'line-width': 0.5,
+                                'line-opacity':0.5*options["grid-opacity"]
+                            }
+                        });
+                    }
+                }
+
+
+
+
+
+                function simpleAverageCoord(data, fields) {
+                    let sumLat = 0;
+                    let sumLng = 0;
+
+                    data.forEach((row) => {
+                        sumLat += parseFloat(row[fields.y]);
+                        sumLng += parseFloat(row[fields.x]);
+                    });
+
+                    const avgLat = sumLat / data.length;
+                    const avgLng = sumLng / data.length;
+
+                    return [avgLng, avgLat];
+                }
+
+                function simpleBounds(data, fields) {
+                    let minLat = Infinity;
+                    let minLng = Infinity;
+
+                    let maxLat = -Infinity;
+                    let maxLng = -Infinity;
+
+                    data.forEach((row) => {
+
+                        const lat = parseFloat(row[fields.y]);
+                        const lng = parseFloat(row[fields.x]);
+
+                        if(lat<minLat){
+                            minLat=lat;
+                        }
+                        if(lat>maxLat){
+                            maxLat=lat;
+                        }
+
+                        if(lng<minLng){
+                            minLng=lng;
+                        }
+                        if(lng>maxLng){
+                            maxLng=lng;
+                        }
+
+
+                    });
+
+                
+
+                    return [minLng, minLat, maxLng, maxLat];
+                }
+
+                map.setCenter(simpleAverageCoord(data, fields))
+
+
+                fields.resolution = options['hex-grid-zoom'];
+                fields.color = options["source-color"].hex;
+                fields.index = '_source_hex'
+
+                // Add the hexagons as a GeoJSON source
+                const hexagons = generateCells(data, fields, grid);
+
+                map.addSource('hex-tiles', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: Object.values(hexagons)
+                    }
+                });
+
+                map.addLayer({
+                    id: 'hex-layer',
+                    type: 'fill-extrusion',
+                    source: 'hex-tiles',
+                    paint: {
+                        'fill-extrusion-color': ['get', 'color'],
+                        'fill-extrusion-opacity': options["source-color"].opacity,
+                        'fill-extrusion-height': ['get', 'height'],
+                        'fill-extrusion-base': ['get', 'base']
+
+                    }
+                });
+
+
+                map.on('click', 'hex-layer', e => {
+                    const feature = e.features[0];
+                    console.log(feature)
+
+                    // coord = JSON.parse(feature.properties.center)
+                    // new mapboxgl.Popup()
+                    //     .setLngLat([coord[1], coord[0]])
+                    //     .setHTML(`Hex Source: Hello world`)
+                    //     .addTo(map);
+
+                });
+                map.on('mouseenter', 'hex-layer', () => {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+                map.on('mouseleave', 'hex-layer', () => {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                if (destFields) {
+
+                    destFields.resolution = options['hex-grid-zoom'];
+                    destFields.color = options["dest-color"].hex;
+                    destFields.offsets = [hexagons]
+                    destFields.index = '_dest_hex'
+
+                    const destHexagons = generateCells(data, destFields, grid);
+
+                    map.addSource('hex-tiles-dest', {
+                        type: 'geojson',
+                        data: {
+                            type: 'FeatureCollection',
+                            features: Object.values(destHexagons)
+                        }
+                    });
+
+
+
+                    map.addLayer({
+                        id: 'hex-layer-dest',
+                        type: 'fill-extrusion',
+                        source: 'hex-tiles-dest',
+                        paint: {
+                            'fill-extrusion-color': ['get', 'color'],
+                            'fill-extrusion-opacity': options["dest-color"].opacity,
+                            'fill-extrusion-height': ['get', 'height'],
+                            'fill-extrusion-base': ['get', 'base']
+
+                        }
+                    });
+
+
+
+                    map.on('click', 'hex-layer-dest', e => {
+                        const feature = e.features[0];
+                        console.log(feature)
+
+                        // coord = JSON.parse(feature.properties.center)
+                        // new mapboxgl.Popup()
+                        //     .setLngLat([coord[1], coord[0]])
+                        //     .setHTML(`Hex Dest: Hello world`)
+                        //     .addTo(map);
+                    });
+                    map.on('mouseenter', 'hex-layer-dest', () => {
+                        map.getCanvas().style.cursor = 'pointer';
+                    });
+                    map.on('mouseleave', 'hex-layer-dest', () => {
+                        map.getCanvas().style.cursor = '';
+                    });
+
+
+
+                    if (typeof options['arc-opacity'] != 'number' || options['arc-opacity'] > 0) {
+
+                        const arcLayer = new deck.ArcLayer({
+                            id: 'arc-layer',
+                            data: data.filter((row) => {
+                                return Math.random() <= options['arc-sample'];
+                            }).map((row) => {
+
+                                const source = grid.get_center(row['_source_hex'])
+                                const dest = grid.get_center(row['_dest_hex'])
+
+
+                                // const source=[parseFloat(row[fields.x]), parseFloat(row[fields.y])];
+                                // const dest=[parseFloat(row[destFields.x]), parseFloat(row[destFields.y])];
+                                return {
+                                    source: {
+                                        to: row['_dest_hex'],
+                                        from: row['_source_hex']
+                                    },
+                                    sourcePosition: [source[1], source[0], getHexTop(source, hexagons, grid)],
+                                    targetPosition: [dest[1], dest[0], getHexTop(dest, destHexagons, grid)],
+                                    sourceColor: options["source-color"].rgba,
+                                    destColor: options["dest-color"].rgba
+                                };
+                            }),
+
+                            getSourcePosition: d => d.sourcePosition,
+                            getTargetPosition: d => d.targetPosition,
+                            getSourceColor: d => d.sourceColor,
+                            getTargetColor: d => d.destColor,
+                            getWidth: options['arc-width'],
+                            getTilt: d => {
+                                return Math.random() * 10 - 5;
+                            },
+                            getHeight: d => {
+                                return 0.95 + Math.random() * .10
+                            },
+                        });
+
+                        const overlay = new deck.MapboxOverlay({
+                            layers: [arcLayer]
+                        });
+
+                        document.title+=` with arcs`;
+                        map.addControl(overlay);
+                    }
+
+
+                }
+                if (map.getLayer('wireframe-layer')) {
+                    map.moveLayer('wireframe-layer');
+                }
+
+            });
+
+
+        };
+
+
+
+
+        function getHexTop(coord_yx, hexes, resolution) {
+            const centerH3Index = grid.get_index(coord_yx[0], coord_yx[1]);
+
+            return getHeight(centerH3Index, [hexes]);
+        };
+
+        function getHeight(index, offsets) {
+
+            let base = 0;
+
+            offsets = offsets.map((list) => {
+                return list[index];
+            }).filter((hex) => {
+                return hex;
+            });
+
+            if (offsets.length > 0) {
+                const offset = offsets.pop()['properties'];
+                base += offset['height'];
+            }
+
+            return base;
+
+        }
+
+        function parseHexWithAlpha(hex, arcOpacity) {
+            if (!/^#([a-fA-F0-9]{8})$/.test(hex)) {
+                throw new Error('Expected hex in #AARRGGBB format');
+            }
+
+            if (typeof arcOpacity != 'number') {
+                arcOpacity = 1;
+            }
+
+            const a = parseInt(hex.slice(1, 3), 16);
+            const alpha = a / 255;
+            const r = parseInt(hex.slice(3, 5), 16);
+            const g = parseInt(hex.slice(5, 7), 16);
+            const b = parseInt(hex.slice(7, 9), 16);
+
+            const rgb = [r, g, b];
+            const rgba = [r, g, b, a * arcOpacity];
+            const hexColor = `#${hex.slice(3)}`;
+
+            return {
+                hex: hexColor,      // "#ff9999"
+                opacity: +alpha.toFixed(3), // 0.6
+                rgb,                 // [255, 153, 153]
+                rgba
+            };
+        }
+
+
+        function getBase(index, offsets) {
+
+            let base = 0;
+
+            offsets = offsets.map((list) => {
+                return list[index];
+            }).filter((hex) => {
+                return hex;
+            });
+
+            if (offsets.length > 0) {
+                const offset = offsets.pop()['properties'];
+                base += offset['base'] + offset['height'];
+            }
+
+            return base;
+
+        }
+
+        function generateCells(results, config, grid) {
+
+            const hexagons = {};
+
+            results.forEach((row) => {
+
+
+                const centerH3Index = grid.get_index(parseFloat(row[config.y]), parseFloat(row[config.x]), config.resolution);
+                if (config.index) {
+                    row[config.index] = centerH3Index
+                }
+
+                // Buffer hexagons around the center
+                const hexIndexes = grid.get_radius_indexes(centerH3Index, 0); // 1 ring radius for neighboring hexes
+
+                var height = options['height-scale'];
+                if (typeof row.count != 'undefined') {
+                    height = parseInt(row.count) * options['height-scale'];
+                }
+
+                hexIndexes.forEach((index) => {
+
+                    if (typeof hexagons[index] == 'undefined') {
+
+
+                        let base = 0;
+                        if (config.offsets) {
+                            base = getBase(index, config.offsets);
+                        }
+
+                        hexagons[index] = {
+                            type: 'Feature',
+                            geometry: grid.get_geometry(index),
+                            properties: {
+                                color: config.color,
+                                height: (index == centerH3Index ? height : 0) + base + options['min-height'],
+                                base: base,
+                                center: grid.get_center(index),
+                                cell: index,
+                                count: 1
+                            }
+                        };
+
+                        return
+
+                    }
+
+                    if (index == centerH3Index) {
+                        hexagons[index]['properties']['height'] = hexagons[index]['properties']['height'] + height;
+                        hexagons[index]['properties']['count'] = hexagons[index]['properties']['count'] + 1;
+                    }
+
+                });
+
+
+
+            });
+
+            return hexagons;
+
+        }
+
+        let cancelRotate = true;
+        const rotateMap = function () {
+            const duration = 200; // Time per frame in milliseconds
+            const rotationStep = 1; // Degrees to rotate per frame
+
+            function animate() {
+                const currentBearing = map.getBearing();
+                map.easeTo({
+                    bearing: currentBearing + rotationStep,
+                    duration: duration,
+                    easing: t => t // Linear easing for smooth rotation
+                });
+                if (cancelRotate) {
+                    return;
+                }
+                requestAnimationFrame(animate); // Keep the animation running
+            }
+
+            animate();
+        }
+
+        const spin = document.getElementById('overlay-spin')
+        spin.onclick = function () {
+            if (cancelRotate) {
+                cancelRotate = false;
+                rotateMap();
+                return;
+            }
+            cancelRotate = true;
+
+        }
+
+
+        const toggleLightDark = document.getElementById('overlay-light-dark')
+        toggleLightDark.onclick = function () {
+
+            (async () => {
+                const mapEl = document.getElementById('map');
+                if (mapEl.classList.contains('dark')) {
+
+
+                    map.setStyle(styles.light);
+
+
+                    await map.once('style.load');
+                    map.setFog(fog.light);
+                    drawLayers('light');
+
+                    mapEl.classList.remove('dark')
+                    mapEl.classList.add('light')
+
+
+
+
+                    return;
+                }
+
+                if (mapEl.classList.contains('light')) {
+
+
+                    map.setStyle(styles.street);
+
+
+                    await map.once('style.load');
+                    // map.setFog(fog.light);
+                    drawLayers('light');
+                    mapEl.classList.remove('light')
+
+                    return;
+                }
+
+
+
+                map.setStyle(styles.dark);
+
+
+                await map.once('style.load');
+                map.setFog(fog.dark);
+                drawLayers('light');
+
+                mapEl.classList.add('dark')
+
+            })();
+
+
+        }
+
+
+
+
+
+
+
+
+        function fetchGridFromUrl(url, cb) {
+
+            const grid = {{GRID}};
+    
+            if (grid.type) {
+                cb(grid);
+            }
+
+        }
+
+        function fetchCsvFromUrl(url, cb) {
+
+            Papa.parse(`{{DATA}}`.trim(), {
+                complete: function (results) {
+                    //const hexagons = parseCsvToHexagons(results.data);
+                    cb(results);
+                },
+                header: true // Assuming the CSV has headers, you can change this based on your file
+            });
+
+        }
+
+
+    </script>
+
+</body>
+
+</html>

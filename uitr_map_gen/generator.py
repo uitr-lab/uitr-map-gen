@@ -1,2 +1,2 @@
-def hello_world():
+def generate():
     print(f"hello world")
