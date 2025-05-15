@@ -41,32 +41,34 @@ def generate(config, out='./my-map.html'):
                 gdf = gdf.to_crs(epsg=4326)
                 geojson_grid = gdf.to_json()
                             
+        from importlib.resources import files
 
+        template = files("uitr_map_gen").joinpath("hexmap.template.html")
+        template = template.read_text(encoding="utf-8")
+        # template = os.path.join(os.path.dirname(__file__), 'hexmap.template.html')
 
-        template = os.path.join(os.path.dirname(__file__), 'hexmap.template.html')
+        # with open(template, "r", encoding="utf-8") as template_file:
+        #         template = template_file.read()  # Reads the entire file
 
-        with open(template, "r", encoding="utf-8") as template_file:
-                template = template_file.read()  # Reads the entire file
+        with csv_string(input) as data:
+        
+        # with open(input, "r", encoding="utf-8") as csv_file:
+        #     data = csv_file.read()  # Reads the entire file
 
-                with csv_string(input) as data:
+            for key, value in config['map'].items():
                 
-                # with open(input, "r", encoding="utf-8") as csv_file:
-                #     data = csv_file.read()  # Reads the entire file
+                key=key.replace('-', '_').upper()
+                print(f"{key}:{value}")
+                if key.endswith('_JSON'):
+                    key = key.replace('_JSON', '')
+                    value=json.dumps(value)
+                    
+                template=template.replace(f"{{{{{key}}}}}", value);
 
-                    for key, value in config['map'].items():
-                        
-                        key=key.replace('-', '_').upper()
-                        print(f"{key}:{value}")
-                        if key.endswith('_JSON'):
-                            key = key.replace('_JSON', '')
-                            value=json.dumps(value)
-                            
-                        template=template.replace(f"{{{{{key}}}}}", value);
-
-                    template=template.replace("{{DATA}}", data).strip()
-                    template=template.replace("{{GRID}}", geojson_grid).strip()
-                    with open(output, "w", encoding="utf-8") as hexmap_file:
-                        hexmap_file.write(template)
+            template=template.replace("{{DATA}}", data).strip()
+            template=template.replace("{{GRID}}", geojson_grid).strip()
+            with open(output, "w", encoding="utf-8") as hexmap_file:
+                hexmap_file.write(template)
 
     _generate(config, out=out)
 
