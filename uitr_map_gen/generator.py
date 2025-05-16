@@ -63,7 +63,7 @@ def generate(config, out='./my-map.html'):
                     
                     df = pd.read_csv(io.StringIO(data))
             
-                    print(df.iloc[0])
+                    # print(df.iloc[0])
                    
                     transformer = Transformer.from_crs(config['fields']['crs'], "EPSG:4326", always_xy=True)
                     source = config['fields']['source']
