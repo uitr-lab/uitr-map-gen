@@ -719,7 +719,9 @@
 
                 if(options['fields']['count']){
                     sourceFields.count=options['fields']['count'];
-                    destFields.count=options['fields']['count']
+                    if(destFields){
+                        destFields.count=options['fields']['count'];
+                    }
                 }
 
                 return;
