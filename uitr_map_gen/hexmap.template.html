@@ -210,7 +210,7 @@
 
             grid = new H3Cells(options['hex-grid-zoom']);
 
-            detectFieldNames();
+            
 
             if (fog[options.style]) {
                 map.setFog(fog[options.style]);
@@ -256,6 +256,7 @@
                     });
                 }
                 
+                detectFieldNames();
 
                 if(options['grid']&&options['grid']=='square'){
                     grid=new SquareCells(dataBounds(), getOpt('square-size', 1000));
