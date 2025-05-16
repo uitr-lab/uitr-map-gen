@@ -468,10 +468,11 @@
 
                 // Buffer hexagons around the center (this may not be implemented and just return [centerIndex])
                 const cellIndexes = grid.getRadiusIndexes(centerIndex, 0); // 1 ring radius for neighboring hexes
+                let countField=config.count||'count';
 
                 var height = typeof config.height=='number'?config.height:options['height-scale'];
-                if (typeof row.count != 'undefined') {
-                    height = parseInt(row.count) * height
+                if (typeof row[countField] != 'undefined') {
+                    height = parseInt(row[countField]) * height
                 }
 
                 cellIndexes.forEach((index) => {
@@ -714,6 +715,11 @@
 
                 if(options['fields']['dest']){
                     destFields=options['fields']['dest']
+                }
+
+                if(options['fields']['count']){
+                    sourceFields.count=options['fields']['count'];
+                    destFields.count=options['fields']['count']
                 }
 
                 return;
