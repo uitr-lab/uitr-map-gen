@@ -136,7 +136,8 @@
          const styles = {
             'light': 'mapbox://styles/mapbox/light-v10',
             'dark': 'mapbox://styles/mapbox/dark-v10',
-            'street': 'mapbox://styles/mapbox/streets-v12'
+            'street': 'mapbox://styles/mapbox/streets-v12',
+            'satellite':'mapbox://styles/mapbox/satellite-streets-v12'
         }
 
         const fog = {
@@ -155,7 +156,8 @@
                 "high-color": '#000000',
                 "space-color": '#000000',
                 "star-intensity": 0.3
-            }
+            },
+            satellite:false,
 
         }
 
@@ -683,6 +685,22 @@
                     // map.setFog(fog.light);
                     drawLayers('light');
                     mapEl.classList.remove('light')
+                    mapEl.classList.add('street')
+
+                    return;
+                }
+
+
+                if (mapEl.classList.contains('street')) {
+
+
+                    map.setStyle(styles.satellite);
+
+                    await map.once('style.load');
+                    // map.setFog(fog.light);
+                    drawLayers('satellite');
+                    mapEl.classList.remove('street')
+                    mapEl.classList.add('satellite')
 
                     return;
                 }
@@ -696,6 +714,7 @@
                 map.setFog(fog.dark);
                 drawLayers('light');
 
+                mapEl.classList.remove('satellite')
                 mapEl.classList.add('dark')
 
             })();

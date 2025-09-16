@@ -21,6 +21,10 @@ def generate(config, out='./my-map.html'):
         
     def _generate(config, path='./', out='./out.html'):
         print(config)
+        
+        from importlib.metadata import version 
+        print(version("uitr-map-gen"))
+        
         # path=os.path.dirname(config_path)
         input=config['input']
         if not input.startswith('/'):
