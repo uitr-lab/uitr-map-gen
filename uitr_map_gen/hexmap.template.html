@@ -211,6 +211,8 @@
             antialias: true
         });
 
+       
+
         let grid=null;
 
         map.on('click', e => {
@@ -272,6 +274,18 @@
             
 
         });
+
+        map.once('load', ()=>{
+
+            map.addControl(new mapboxgl.NavigationControl({ showCompass: true , showZoom:false}), 'top-right');
+            map.addControl(new mapboxgl.NavigationControl({ showCompass: false , showZoom:true}), 'bottom-left');
+
+
+            if(options['show-3d']===true){
+                 map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+            }
+
+        })
 
         map.on('move', () => {
             const center = map.getCenter();   // returns {lng, lat}
@@ -357,8 +371,7 @@
                     }
                 }
                 map.addLayer(sourceLayer);
-                map.addControl(new mapboxgl.NavigationControl({ showCompass: true , showZoom:false}), 'top-right');
-                map.addControl(new mapboxgl.NavigationControl({ showCompass: false , showZoom:true}), 'bottom-left');
+                
                 
 
                 if (destFields) {
