@@ -281,16 +281,7 @@
             map.addControl(new mapboxgl.NavigationControl({ showCompass: false , showZoom:true}), 'bottom-left');
 
 
-            if(options['show-3d']===true){
-
-                map.addSource('mapbox-dem', {
-                    'type': 'raster-dem',
-                    'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                    'tileSize': 512,
-                    'maxzoom': 14
-                });
-                 map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-            }
+            
 
         })
 
@@ -345,6 +336,19 @@
                 map.setCenter(dataCenter());
 
                 createFieldData();
+
+
+                if(options['show-3d']===true){
+
+                    map.addSource('mapbox-dem', {
+                        'type': 'raster-dem',
+                        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        'tileSize': 512,
+                        'maxzoom': 14
+                    });
+                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+                }
+
 
                 if(!sourceFeatures){
                     sourceFeatures = generateHistogramCells(data, sourceFields, grid, 'source');
