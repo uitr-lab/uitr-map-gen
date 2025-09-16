@@ -14,6 +14,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
     <style>
+        {{STYLE}}
+    </style>
+   
+    <style>
         body,
         html {
             margin: 0;
@@ -81,6 +85,24 @@
             right: unset !important;
             left: 10px;
         }
+
+
+
+        div#sidepanel> div {
+            width: 0;
+            transition: width 0.2s;
+        }
+
+        div#sidepanel:has(+ #main #overlay-options.active) > div {
+            width: 300px;
+            overflow: hidden;
+        }
+
+        div#sidepanel> div>form {
+            width: 300px;
+            overflow: hidden;
+        }
+
 
     </style>
 </head>
@@ -240,9 +262,25 @@
 
             });
 
+
+            getOpt('filters',[]).forEach((filter)=>{
+                addFilterControl(filter);
+            });
+
             
 
         });
+
+        map.on('move', () => {
+            const center = map.getCenter();   // returns {lng, lat}
+            const zoom = map.getZoom();       // number
+            const pitch = map.getPitch();     // degrees
+            const bearing = map.getBearing(); // degrees
+
+            console.log(JSON.stringify({
+                    center, zoom, pitch, bearing
+                }, null, 4));
+            });
 
 
         
@@ -317,8 +355,8 @@
                     }
                 }
                 map.addLayer(sourceLayer);
-
-
+                map.addControl(new mapboxgl.NavigationControl({ showCompass: true , showZoom:false}), 'top-right');
+                map.addControl(new mapboxgl.NavigationControl({ showCompass: false , showZoom:true}), 'bottom-left');
                 
 
                 if (destFields) {
@@ -734,6 +772,28 @@
                 sourceFields = { x: k_[keys.indexOf('lng')], y: k_[keys.indexOf('lat')] };
             }
 
+
+            // lowercase named fields that represent sourcex, sourcey destx, desty
+            // there is no mixing and matching, if orgin_xy is defined but not dest_xy 
+            // then no dest features will be drawn even if some other dest ie: des_lat/lng is defined
+            const checkPairs=[
+                ['origin_x', 'origin_y', 'dest_x', 'dest_y'],          
+                ['org_lon', 'org_lat', 'des_lon', 'des_lat'],
+            ];
+
+            for(let i=0;i<checkPairs.length;i++){
+                let [ox, oy, dx, dy]=checkPairs[i]
+                if (keys.indexOf(ox) > 0 && keys.indexOf(oy) > 0) {
+                    sourceFields = { x: k_[keys.indexOf(ox)], y: k_[keys.indexOf(oy)] };
+                    if (keys.indexOf(dx) > 0 && keys.indexOf(dy) > 0) {
+                        destFields = { x: k_[keys.indexOf(dx)], y: k_[keys.indexOf(dy)] };
+                    }
+                    return;
+                }
+            }
+
+            
+
             if (keys.indexOf('origin_x') > 0 && keys.indexOf('origin_y') > 0) {
                 sourceFields = { x: k_[keys.indexOf('origin_x')], y: k_[keys.indexOf('origin_y')] };
                 if (keys.indexOf('dest_x') > 0 && keys.indexOf('dest_y') > 0) {
@@ -1035,6 +1095,42 @@
 
         };
 
+
+    </script>
+
+
+    <script>
+
+        {{SCRIPT}}
+
+
+        var renderer=new SurveyRenderer();
+        document.getElementById('sidepanel').appendChild(renderer.render({
+   "name": "Section One",
+   "type": "section",
+   "uuid": "8822cbbe-a991-4f89-a5cf-c7e42d5528e5",
+   "items": [
+      {
+         "name": "Page One",
+         "type": "set",
+         "items": [
+            {
+               "fieldName": "radioOption",
+               "type": "radio",
+               "values": "grid, hex, square",
+               "defaultValue": "",
+               "labels": "Shp, Hex, Square",
+               "label": "Map Style"
+            }
+         ]
+      }
+   ],
+   "entryLogic": "",
+   "exitLogic": "",
+   "backLogic": "",
+   "navigationLogic": "return 0;",
+   "then": "terminate"
+}));
 
     </script>
 

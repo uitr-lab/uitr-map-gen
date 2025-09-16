@@ -1,1 +1,3 @@
 recursive-include uitr_map_gen *.html
+recursive-include uitr_map_gen *.css
+recursive-include uitr_map_gen *.js

@@ -94,6 +94,21 @@ def generate(config, out='./my-map.html'):
 
             template=template.replace("{{DATA}}", data).strip()
             template=template.replace("{{GRID}}", geojson_grid).strip()
+            
+            
+            
+            
+            js = files("uitr_map_gen").joinpath("form.js")
+            js = js.read_text(encoding="utf-8")
+            
+            style = files("uitr_map_gen").joinpath("style.css")
+            style = style.read_text(encoding="utf-8")
+            
+            template=template.replace("{{STYLE}}", style).strip()
+            template=template.replace("{{SCRIPT}}", js).strip()
+            
+            
+            
             with open(output, "w", encoding="utf-8") as hexmap_file:
                 hexmap_file.write(template)
 

@@ -1,0 +1,150 @@
+
+
+form.survey-view,  pre.survey-data{
+    line-height: 1.5em;
+    margin: auto;
+    max-width: 1000px;
+    background: rgba(0,0,0,0.05);
+    padding: 40px;
+    margin-bottom: 30px;
+}
+
+
+
+form.survey-view label, form.survey-view .option {
+    display: block;
+}
+
+form.survey-view .option>label {
+    display: inline;
+}
+
+form.survey-view label>input[type="text"] {
+    margin-left: 10px;
+    min-height: 22px;
+    min-width:350px;
+    padding: 3px 7px;
+}
+
+form.survey-view label>input, form.survey-view .option>select {
+    margin-left: 10px;
+    min-height: 22px;
+    padding: 3px 7px;
+    box-sizing: content-box;
+}
+
+
+form.survey-view nav button, form.survey-view .nav button {
+    background: mediumaquamarine;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    box-shadow: 0 0 3px #00000042;
+    margin: 10px;
+    font-size: 20px;
+}
+
+form.survey-view nav {
+    text-align: right;
+    margin: 50px;
+}
+
+
+form.survey-view .markdown img {
+    max-width: 100%;
+}
+
+
+form.survey-view fieldset {
+    margin: 5px;
+    border: 1px solid rgba(0,0,0,0.3);
+    border-radius: 3px;
+    margin-bottom: 10px;
+}
+
+
+form.survey-view fieldset>fieldset {
+    padding: unset;
+    border: unset;
+    background: unset;
+    margin: unset;
+}
+
+
+form.survey-view h2.set-label {
+    display: none;
+}
+
+form.survey-view.set-view h2.set-label {
+    display: block;
+}
+
+form.survey-view h1.node-label, form.survey-view h2.set-label {
+    border-bottom: 1px dashed gray;
+    padding-bottom: 20px;
+}
+
+
+form.survey-view fieldset label, form.survey-view fieldset .option {
+    width: 70%;
+    margin-bottom: 10px;
+    line-height: 30px;
+}
+
+form.survey-view fieldset {
+    padding: 50px 20px;
+    border: none;
+    background: rgba(0,0,0,0.03);
+    margin: 30px 5px;
+
+}
+
+form.survey-view fieldset label:not( :has( input ) ), 
+form.survey-view fieldset label:has( label ) , 
+form.survey-view fieldset label:has( span ) {
+    text-align: left;
+    font-weight: 600;
+}
+
+
+form.survey-view label>label {
+    font-weight: 400;
+}
+
+form.survey-view blockquote > p {
+    padding: 9px 30px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 3px;
+    font-style: italic;
+}
+
+form.survey-view blockquote {
+    width: 70%;
+    margin: auto;
+}
+
+form.survey-view fieldset label>input[type="checkbox"] {
+    margin-right: 104px;
+}
+
+form.survey-view nav button.disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+
+form.survey-view label[data-validation-error], 
+form.survey-view .option[data-validation-error] {
+    color: #b71a37;
+    font-weight:bold;
+}
+
+form.survey-view label[data-validation-error]:after, 
+form.survey-view .option[data-validation-error]:after  {
+    content: attr(data-validation-error);
+    text-indent: 5px;
+    display: inline-block;
+}
+
+
