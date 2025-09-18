@@ -297,9 +297,82 @@
             });
 
 
+        const _checkTypes=(set)=>{
+
+            var types=[];
+            set.features.forEach((feature)=>{
+                if(types.indexOf(feature.geometry.type)==-1){
+                    types.push(feature.geometry.type)
+                }
+            })
+            return types;
+        };
         
 
         const drawLayers = () => {
+            fetchBase('data.csv', (results) => {
+
+
+                var colors=['#f1eef6','#d7b5d8','#df65b0','#dd1c77','#980043']
+
+                results.forEach((data,i)=>{
+
+                    if(!Array.isArray(data)){
+                        data=[data]
+                    }
+
+                    data.forEach((set,j)=>{
+
+                        var types=_checkTypes(set)
+
+                        map.addSource(`${i}-${j}-geojson`, {
+                            type: 'geojson',
+                            data: set  // can also be a GeoJSON object
+                            });
+
+
+                        if(types.indexOf('Polygon')>=0||types.indexOf('MultiPolygon')>=0){
+                            
+
+                                // Add a layer to visualize the GeoJSON
+                                map.addLayer({
+                                id: `${i}-${j}-geojson-layer-poly`,
+                                type: 'fill', // "line" or "circle" depending on geometry
+                                source: `${i}-${j}-geojson`,
+                                paint: {
+                                    'fill-color': colors[i],
+                                    'fill-opacity': 0.6
+                                } 
+                            });
+                        }
+
+
+                        if(types.indexOf('Point')>=0){
+                            map.addLayer({
+                                id: `${i}-${j}-geojson-layer-points`,
+                                type: 'circle',
+                                source: `${i}-${j}-geojson`,
+                                paint: {
+                                    'circle-color': colors[i],
+                                    'circle-radius': {
+                                    // scale radius based on zoom level
+                                    stops: [
+                                        [5, 1],   // zoom 5 → radius 2px
+                                        [10, 3],  // zoom 10 → radius 6px
+                                        [15, 8]  // zoom 15 → radius 12px
+                                    ],
+                                    base: 1
+                                    },
+                                    'circle-stroke-color': '#000',
+                                    'circle-stroke-width': 1
+                                }
+                            });
+                        }
+                        
+                    });
+                });
+
+            });
             fetchCsv('data.csv', (results) => {
 
                 if(!data){
@@ -346,7 +419,7 @@
                         'tileSize': 512,
                         'maxzoom': 14
                     });
-                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
+                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 2.0 });
                 }
 
 
@@ -1138,6 +1211,23 @@
             });
 
         };
+
+
+        let fetchBase = (url, cb) => {
+
+            results = {{BASE}};
+             
+            //const hexagons = parseCsvToHexagons(results.data);
+            cb(results);
+            fetchBase=(url, cb)=>{
+                // only parse once
+                cb(results);
+            }
+               
+
+        };
+
+
 
 
     </script>

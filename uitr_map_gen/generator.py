@@ -3,7 +3,7 @@ import pandas as pd
 import geopandas as gpd
 from pathlib import Path
 from pyproj import Transformer
-
+import zipfile
 
 # import webbrowser
 
@@ -23,7 +23,7 @@ def generate(config, out='./my-map.html'):
         print(config)
         
         from importlib.metadata import version 
-        print(version("uitr-map-gen"))
+        print(f'Version: {version("uitr-map-gen")}')
         
         # path=os.path.dirname(config_path)
         input=config['input']
@@ -84,23 +84,43 @@ def generate(config, out='./my-map.html'):
 
             for key, value in config['map'].items():
                 
-                
                 key=key.replace('-', '_').upper()
                 print(f"{key}:{value}")
                 if key.endswith('_JSON'):
                     key = key.replace('_JSON', '')
-                    value=json.dumps(value)
-                
-                
-                    
-                    
+                    value=json.dumps(value)    
                 template=template.replace(f"{{{{{key}}}}}", value);
+
 
             template=template.replace("{{DATA}}", data).strip()
             template=template.replace("{{GRID}}", geojson_grid).strip()
             
             
             
+            geojson_list=[]
+            if isinstance(config['base-layers'], dict):
+                pass
+            if isinstance(config['base-layers'], list):
+                for kmz_path in config['base-layers']:
+                    
+                    if isinstance(kmz_path, list):
+                        sub_list=[]
+                        for p in kmz_path:
+                            sub_list.append(read_kmz(p))
+                            
+                        geojson_list.append(sub_list)
+                        print(f'Append geojson list: ')
+                    else:
+                    
+                        print(f'{kmz_path}') 
+                        geojson_list.append(read_kmz(kmz_path))
+                        print(f'Append geojson: ')
+                        
+            
+      
+            geojson_base = json.dumps(geojson_list, indent=3)
+                 
+            template=template.replace("{{BASE}}", geojson_base).strip()      
             
             js = files("uitr_map_gen").joinpath("form.js")
             js = js.read_text(encoding="utf-8")
@@ -130,7 +150,24 @@ def generate(config, out='./my-map.html'):
 
 
 
+def read_kmz(kmz_path):
+    kml_path = "default.kml"
 
+    with zipfile.ZipFile(kmz_path, 'r') as kmz:
+        # KMZ usually contains a single KML file
+        for name in kmz.namelist():
+            if name.endswith(".kml"):
+                kmz.extract(name, ".")
+                kml_path = name
+                print(f'{kml_path}') 
+                break
+
+    # Read KML into GeoDataFrame
+    gdf = gpd.read_file(kml_path, driver='KML')
+
+    # Export to GeoJSON
+    gdf = gdf.to_crs(epsg=4326)
+    return json.loads(gdf.to_json())
 
 
 
