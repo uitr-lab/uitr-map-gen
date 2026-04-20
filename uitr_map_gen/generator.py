@@ -30,7 +30,7 @@ def generate(config, out='./my-map.html'):
         input=None
         if 'input' in config:
             input=config['input']
-            if not input.startswith('/'):
+            if isinstance(input, str) and not input.startswith('/'):
                 input = os.path.join(path, input)
 
         output=out
@@ -241,6 +241,20 @@ def csv_string(file):
     '''
     Read csv or xlsx, but return csv text
     '''
+    
+    if isinstance(file, pd.DataFrame):
+        buffer = io.StringIO()
+        try:
+            df =file
+            df.to_csv(buffer, index=False)
+            buffer.seek(0)  
+            yield buffer.read()
+        finally:
+            buffer.close()
+        
+        return
+    
+    
     if not os.path.exists(file):
         file=os.path.realpath(file)
         raise Exception(f"File Not Found: {file}")
