@@ -104,6 +104,16 @@
         }
 
 
+        .user-marker {
+            width: 16px;
+            height: 16px;
+            background-color: cornflowerblue;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+        }
+
+
     </style>
 </head>
 
@@ -313,7 +323,7 @@
             fetchBase('data.csv', (results) => {
 
 
-                var colors=['#f1eef6','#d7b5d8','#df65b0','#dd1c77','#980043']
+                var colors=['#f1eef6','#d7b5d8','#df65b0','#dd1c77','#980043', '#f1eef6','#d7b5d8','#df65b0','#dd1c77','#980043']
 
                 results.forEach((data,i)=>{
 
@@ -324,6 +334,7 @@
                     data.forEach((set,j)=>{
 
                         var types=_checkTypes(set)
+                        console.log(types)
 
                         map.addSource(`${i}-${j}-geojson`, {
                             type: 'geojson',
@@ -346,6 +357,19 @@
                             });
                         }
 
+
+                        if (types.indexOf('LineString') >= 0 || types.indexOf('MultiLineString') >= 0) {
+                            // LineString layer
+                            map.addLayer({
+                                id: `${i}-${j}-geojson-layer-line`,
+                                type: 'line',
+                                source: `${i}-${j}-geojson`,
+                                paint: {
+                                    'line-color': colors[i],
+                                    'line-width': 4  // adjust thickness
+                                }
+                            });
+                        }
 
                         if(types.indexOf('Point')>=0){
                             map.addLayer({
@@ -381,7 +405,11 @@
                     });
                 }
                 
-                detectFieldNames();
+                try{
+                    detectFieldNames();
+                }catch(e){
+                    console.error(e);
+                }
 
                 if(options['grid']&&options['grid']=='square'){
                     grid=new SquareCells(dataBounds(), getOpt('square-size', 1000));
@@ -405,10 +433,96 @@
                         }
                     });
                 }
-
-                map.setCenter(dataCenter());
+            
+                try{
+                    let center=dataCenter();
+                    map.setCenter(center);
+                }catch(e){
+                    console.error(e);
+                }
 
                 createFieldData();
+
+
+                if(options['show-user']){
+
+
+                    const el = document.createElement('div');
+                    el.className = 'user-marker';
+                    const userMarker = new mapboxgl.Marker({ element: el });
+
+                    let accuracySourceAdded = false;
+
+                    if (navigator.geolocation) {
+                    navigator.geolocation.watchPosition(
+                        pos => {
+                        const lng = pos.coords.longitude;
+                        const lat = pos.coords.latitude;
+                        const accuracy = pos.coords.accuracy; // in meters
+
+                        userMarker.setLngLat([lng, lat]).addTo(map);
+
+                        // Add or update accuracy circle
+                        const circleGeoJSON = createAccuracyCircle([lng, lat], accuracy);
+
+                        if (map.getSource('accuracy-circle')) {
+                            map.getSource('accuracy-circle').setData(circleGeoJSON);
+                        } else {
+                            map.addSource('accuracy-circle', {
+                            type: 'geojson',
+                            data: circleGeoJSON
+                            });
+                            map.addLayer({
+                            id: 'accuracy-circle-layer',
+                            type: 'fill',
+                            source: 'accuracy-circle',
+                            paint: {
+                                'fill-color': 'rgba(100, 149, 237, 0.25)', // light transparent cornflower blue
+                                'fill-outline-color': 'rgba(100, 149, 237, 0.5)'
+                            }
+                            });
+                            accuracySourceAdded = true;
+                        }
+
+                        if (!map._userCentered) {
+                            map.setCenter([lng, lat]);
+                            map._userCentered = true; // only recenter on first fix
+                        }
+                        },
+                        err => console.error('Geolocation error:', err),
+                        { enableHighAccuracy: true, maximumAge: 0 }
+                    );
+                    } else {
+                    alert("Geolocation is not supported by your browser.");
+                    }
+
+                    // Utility: create a circle polygon from center + radius (meters)
+                    function createAccuracyCircle(center, radiusInMeters) {
+                    const points = 64;
+                    const coords = [];
+                    const distanceX = radiusInMeters / (111320 * Math.cos(center[1] * Math.PI / 180));
+                    const distanceY = radiusInMeters / 110574;
+
+                    for (let i = 0; i < points; i++) {
+                        const theta = (i / points) * (2 * Math.PI);
+                        const x = distanceX * Math.cos(theta);
+                        const y = distanceY * Math.sin(theta);
+                        coords.push([center[0] + x, center[1] + y]);
+                    }
+                    coords.push(coords[0]);
+
+                    return {
+                        type: 'FeatureCollection',
+                        features: [{
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Polygon',
+                            coordinates: [coords]
+                        }
+                        }]
+                    };
+                    }
+                }
 
 
                 if(options['show-3d']===true){
